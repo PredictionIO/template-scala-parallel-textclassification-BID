@@ -4,7 +4,7 @@
   "engineFactory": "org.template.textclassification.TextClassificationEngine",
   "datasource": {
     "params": {
-      "appName": "MyTextApp"
+      "appName": "text"
     }
   },
   "preparator": {
@@ -14,9 +14,9 @@
   },
   "algorithms": [
     {
-      "name": "nb",
+      "name": "bid-lr",
       "params": {
-        "lambda": 0.25
+        "regParam": 0.5
       }
     }
   ]

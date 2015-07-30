@@ -72,7 +72,7 @@ class BIDMachLRAlgorithm(
 
           val mm: Learner = trainGLM(features, FMat(categories))
 
-          //test(categories, features, mm)
+          test(categories, features, mm)
           val modelmat = FMat(mm.modelmat)
           val weightSize = size(modelmat)._2 -1
 
@@ -97,10 +97,10 @@ class BIDMachLRAlgorithm(
       val (mm, mopts) = GLM.learner(traindata, traincats, GLM.logistic)
       mopts.what
 
-      mopts.lrate = 1.0
+      mopts.lrate = 0.1
       mopts.reg1weight = regParam
-      mopts.batchSize = 1000
-      mopts.npasses = 50
+      mopts.batchSize = 3300
+      mopts.npasses = 250
       mopts.autoReset = false
       mopts.addConstFeat = true
       mm.train

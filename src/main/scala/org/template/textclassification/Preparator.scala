@@ -45,7 +45,7 @@ class PreparedData(
 
   // 1. Hashing function: Text -> term frequency vector.
 
-  private val hasher = new HashingTF(2000)
+  private val hasher = new HashingTF(1000)
 
   private def hashTF(text: String): Vector = {
     val newList: Array[String] = text.split(" ")
@@ -68,11 +68,11 @@ class PreparedData(
   }
 
   private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : Map[String,Vector] = {
-    val hashedFeats = trainData.data.collect.map(e => hashTF(e.text))
+    val hashedFeats = trainData.data.map(e => hashTF(e.text))
     val indexedRows = hashedFeats.zipWithIndex.map(x => new IndexedRow(x._2, x._1))
 
 
-    val blockMat: BlockMatrix = new IndexedRowMatrix(sc.parallelize(indexedRows)).toBlockMatrix
+    val blockMat: BlockMatrix = new IndexedRowMatrix(indexedRows).toBlockMatrix
 
     //println(blockMat.numCols())
     //println(blockMat.numRows())
@@ -86,10 +86,14 @@ class PreparedData(
 
     val indexedPMIMat = pmiMat.toIndexedRowMatrix()
 
-    println(trainData.data.collect.size)
-    println(indexedPMIMat.rows.collect.size)
+    //val svdedPMImat = indexedPMIMat.computeSVD(500).U
 
-    val pmiMatRows = indexedPMIMat.rows.collect().map(e=> e.index -> e.vector).toMap
+
+    println(trainData.data.count())
+    println(indexedPMIMat.rows.count())
+    //println(svdedPMImat.rows.count())
+
+    val pmiMatRows = indexedPMIMat.rows.map(e=> e.index -> e.vector).collectAsMap()
 
     //TODO: take into account feature counts, currently it's on/off
     //also not use var
@@ -103,7 +107,7 @@ class PreparedData(
         }
         Vectors.dense(ar.map(x=> x/v.size)).toSparse }
 
-    val textToSPPMIVectorMap = (trainData.data.map(x=> x.text).collect() zip composedWordVectors).toMap
+    val textToSPPMIVectorMap = (trainData.data.map(x=> x.text) zip composedWordVectors).collect.toMap
 
     return textToSPPMIVectorMap
   }

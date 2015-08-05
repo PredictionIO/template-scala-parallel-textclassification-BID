@@ -45,7 +45,7 @@ class PreparedData(
 
   // 1. Hashing function: Text -> term frequency vector.
 
-  private val hasher = new HashingTF(1000)
+  private val hasher = new HashingTF(500)
 
   private def hashTF(text: String): Vector = {
     val newList: Array[String] = text.split(" ")
@@ -77,7 +77,7 @@ class PreparedData(
     //println(blockMat.numCols())
     //println(blockMat.numRows())
     val cooccurrences = blockMat.transpose.multiply(blockMat)
-    val locMat = cooccurrences.toLocalMatrix
+    val locMat = cooccurrences.toLocalMatrix.asInstanceOf[DenseMatrix].toSparse
     val k = 1
 
     val pmiEntries = calculateSPPMI(locMat, blockMat.numRows, k)
@@ -86,7 +86,7 @@ class PreparedData(
 
     val indexedPMIMat = pmiMat.toIndexedRowMatrix()
 
-    //val svdedPMImat = indexedPMIMat.computeSVD(500).U
+    //val svdedPMImat = indexedPMIMat.computeSVD(50).U
 
 
     println(trainData.data.count())

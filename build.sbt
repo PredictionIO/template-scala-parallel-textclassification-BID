@@ -7,8 +7,9 @@ scalaVersion := "2.11.6"
 
 libraryDependencies ++= Seq(
   "io.prediction"    % "core_2.11"        % pioVersion.value % "provided",
-  "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
-  "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
+  "org.apache.spark" %% "spark-core" % "1.4.1" % "provided",
+  "org.apache.spark" %% "spark-mllib" % "1.4.1" % "provided",
+  "com.github.fommil.netlib" % "all" % "1.1.2" pomOnly(),
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7"
 )
 

@@ -5,10 +5,11 @@ import io.prediction.controller.PPreparator
 import io.prediction.controller.Params
 import org.apache.spark.SparkContext
 import org.apache.spark.mllib.feature.{IDF, IDFModel, HashingTF}
-import org.apache.spark.mllib.linalg.{Matrix, DenseMatrix, Vector, Vectors}
+import org.apache.spark.mllib.linalg._
 import org.apache.spark.mllib.linalg.distributed._
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.Row
 
 import scala.collection.immutable.HashMap
 import scala.collection.JavaConversions._
@@ -45,7 +46,7 @@ class PreparedData(
 
   // 1. Hashing function: Text -> term frequency vector.
 
-  private val hasher = new HashingTF(500)
+  private val hasher = new HashingTF(1000)
 
   private def hashTF(text: String): Vector = {
     val newList: Array[String] = text.split(" ")
@@ -86,12 +87,17 @@ class PreparedData(
 
     val indexedPMIMat = pmiMat.toIndexedRowMatrix()
 
-    //val svdedPMImat = indexedPMIMat.computeSVD(50).U
+
+
+//    val principalComponents = indexedPMIMat.toRowMatrix().computePrincipalComponents(5)
+//
+//    val pcPMImat = indexedPMIMat.multiply(principalComponents)
+
 
 
     println(trainData.data.count())
-    println(indexedPMIMat.rows.count())
-    //println(svdedPMImat.rows.count())
+    println(indexedPMIMat.numCols())
+//    println(pcPMImat.numCols())
 
     val pmiMatRows = indexedPMIMat.rows.map(e=> e.index -> e.vector).collectAsMap()
 
@@ -107,6 +113,7 @@ class PreparedData(
         }
         Vectors.dense(ar.map(x=> x/v.size)).toSparse }
 
+
     val textToSPPMIVectorMap = (trainData.data.map(x=> x.text) zip composedWordVectors).collect.toMap
 
     return textToSPPMIVectorMap
@@ -114,21 +121,24 @@ class PreparedData(
 
   val ppmiMap = generateSPPMIMatrix(td,sc)
   println(ppmiMap.head._2.size)
+  println(ppmiMap.head)
 
   // 2. Term frequency vector -> t.f.-i.d.f. vector.
 
-  //val idf : IDFModel = new IDF().fit(td.data.map(e => hashTF(e.text)))
+//  val idf : IDFModel = new IDF().fit(td.data.map(e => hashTF(e.text)))
+//
+//
+//   //3. Document Transformer: text => tf-idf vector.
+//
+//    def transform(text : String): Vector = {
+//      // Map(n-gram -> document tf)
+//      val result = idf.transform(hashTF(text))
+//      //println(result)
+//      result
+//    }
 
-
-  // 3. Document Transformer: text => tf-idf vector.
-
-  //  def transform(text : String): Vector = {
-  //    // Map(n-gram -> document tf)
-  //    idf.transform(hashTF(text))
-  //  }
-
-
-
+//
+//
    def transform(text : String): Vector = {
       // Map(n-gram -> document tf)
 

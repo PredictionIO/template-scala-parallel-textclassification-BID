@@ -19,11 +19,8 @@ import io.prediction.controller.{P2LAlgorithm, Params}
 import org.apache.spark.SparkContext
 import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
-
-/**
- * Created by burtn on 15/07/15.
- */
 
 case class BIDMachLRAlgorithmParams (
                                regParam  : Double
@@ -99,7 +96,7 @@ class BIDMachLRAlgorithm(
 
       mopts.lrate = 0.1
       mopts.reg1weight = regParam
-      mopts.batchSize = 3300
+      mopts.batchSize = 1000
       mopts.npasses = 250
       mopts.autoReset = false
       mopts.addConstFeat = true
@@ -121,37 +118,31 @@ class BIDMachLRAlgorithm(
         ((vector, innerLabel), rowIndex) <- sparseVectorsWithRowIndices
       } yield rowIndex.toString + " " + innerLabel.toString + " " + 1
 
-      val cats = catTriples.collect().mkString("\n")
-      val feats = triples.map(x => x._1).collect().mkString("\n")
+      val cats = catTriples
+      val feats = triples.map(x => x._1)
 
-      val catsMat = loadDMatTxt(toBufferedReader(cats), toBufferedReader(cats))
+      val catsMat = loadDMatTxt(cats)
 
-      val featsMat = loadDMatTxt(toBufferedReader(feats), toBufferedReader(feats))
+      val featsMat = loadDMatTxt(feats)
 
       (full(cols2sparse(catsMat,true)), cols2sparse(featsMat,true))
     }
 
-    def toBufferedReader(input: String): BufferedReader ={
-      val is = new ByteArrayInputStream(input.getBytes());
-      new BufferedReader(new InputStreamReader(is));
-    }
-
     //See https://github.com/BIDData/BIDMat/blob/master/src/main/scala/BIDMat/HMat.scala , method loadDMatTxt
-    def loadDMatTxt(fin:BufferedReader, din:BufferedReader):DMat = {
+    def loadDMatTxt(cats:RDD[String]):DMat = {
+
+      val fin = cats.toLocalIterator
       //val fin = new BufferedReader(new InputStreamReader(getInputStream(fname, compressed)))
-      var nrows = 0
-      var firstline = fin.readLine()
-      val parts = firstline.split("[\t ,:]+")
-      while (firstline != null && firstline.length > 0) {
-        firstline = fin.readLine()
-        nrows += 1
-      }
-      fin.close
+
+      val nrows = cats.count().toInt
+
+      val parts = cats.first().split("[\t ,:]+")
+
       val ncols = parts.length
       val out = DMat.newOrCheckDMat(nrows, ncols, null)
       var irow = 0
       while (irow < nrows) {
-        val parts = din.readLine().split("[\t ,:]+")
+        val parts = fin.next.split("[\t ,:]+")
         var icol = 0
         while (icol < ncols) {
           out.data(irow + icol*out.nrows) = parts(icol).toDouble
@@ -159,7 +150,6 @@ class BIDMachLRAlgorithm(
         }
         irow += 1
       }
-      din.close
       out
     }
 
@@ -171,15 +161,23 @@ class BIDMachLRAlgorithm(
 
       val predcats = zeros(testcats.nrows, testcats.ncols)
 
+
+
       val (nn, nopts) = GLM.predictor(mm.model, testdata, predcats)
+
+
 
       nopts.addConstFeat = true
       nn.predict
+
 
       computeAccuracy(FMat(testcats), predcats)
     }
 
     def computeAccuracy(testcats: FMat, predcats: FMat): Unit = {
+      //println(testcats)
+      //println(predcats)
+
       val lacc = (predcats ∙→ testcats + (1 - predcats) ∙→ (1 - testcats)) / predcats.ncols
       lacc.t
       println(mean(lacc))

@@ -65,7 +65,7 @@ class BIDMachLRAlgorithm(
         label => {
           val lab = label.toInt.toString
 
-          val (categories, features) = getDMatsFromData(lab, data)
+          val (categories, features) = getFMatsFromData(lab, data)
 
           val mm: Learner = trainGLM(features, FMat(categories))
 
@@ -104,53 +104,51 @@ class BIDMachLRAlgorithm(
       mm
     }
 
-    def getDMatsFromData(lab: String, data:DataFrame): (DMat, SMat) = {
+    def getFMatsFromData(lab: String, data:DataFrame): (FMat, SMat) = {
       val features = data.select(lab, "features")
-      
-      val sparseVectorsWithRowIndices = (for (r <- features) yield (r.getAs[SparseVector]("features"), r.getAs[Double](lab))).zipWithIndex
+
+      val sparseVectorsWithRowIndices = (for (r <- features) yield (r.getAs[SparseVector](1), r.getAs[Double](0))).zipWithIndex
 
       val triples = for {
         ((vector, innerLabel), rowIndex) <- sparseVectorsWithRowIndices
         (index, value) <- vector.indices zip vector.values
-      }  yield (rowIndex.toString + " " + index.toString + " " + value.toString, innerLabel)
+      }  yield ((rowIndex.toInt,index,value), innerLabel)
 
       val catTriples = for {
         ((vector, innerLabel), rowIndex) <- sparseVectorsWithRowIndices
-      } yield rowIndex.toString + " " + innerLabel.toString + " " + 1
+      } yield (rowIndex.toInt,innerLabel.toInt,1.0)
 
       val cats = catTriples
       val feats = triples.map(x => x._1)
 
-      val catsMat = loadDMatTxt(cats)
+      val numRows = cats.count().toInt
 
-      val featsMat = loadDMatTxt(feats)
+      val catsMat = loadFMatTxt(cats,numRows)
 
-      (full(cols2sparse(catsMat,true)), cols2sparse(featsMat,true))
+      val featsMat = loadFMatTxt(feats,numRows)
+
+      (full(catsMat), featsMat)
     }
 
     //See https://github.com/BIDData/BIDMat/blob/master/src/main/scala/BIDMat/HMat.scala , method loadDMatTxt
-    def loadDMatTxt(cats:RDD[String]):DMat = {
+    def loadFMatTxt(cats:RDD[(Int,Int,Double)], nrows: Int):SMat = {
 
       val fin = cats.toLocalIterator
-      //val fin = new BufferedReader(new InputStreamReader(getInputStream(fname, compressed)))
 
-      val nrows = cats.count().toInt
+      val ncols = 3
 
-      val parts = cats.first().split("[\t ,:]+")
+      val out = FMat.newOrCheckFMat(nrows, ncols, null)
 
-      val ncols = parts.length
-      val out = DMat.newOrCheckDMat(nrows, ncols, null)
-      var irow = 0
-      while (irow < nrows) {
-        val parts = fin.next.split("[\t ,:]+")
-        var icol = 0
-        while (icol < ncols) {
-          out.data(irow + icol*out.nrows) = parts(icol).toDouble
-          icol += 1
+      for ((irow,origCol,value) <- fin) {
+        val parts = Array(irow,origCol,value)
+
+        for (icol <- 0 until ncols) {
+          out.data(irow + icol*out.nrows) = parts(icol).toFloat
+
         }
-        irow += 1
       }
-      out
+      println("LOADED")
+      cols2sparse(out, true)
     }
 
     def test(categories: DMat, features: SMat, mm: Learner): Unit = {

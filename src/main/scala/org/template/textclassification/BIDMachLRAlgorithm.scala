@@ -127,28 +127,22 @@ class BIDMachLRAlgorithm(
 
       val featsMat = loadFMatTxt(feats,numRows)
 
+      println(featsMat)
+
       (full(catsMat), featsMat)
     }
 
     //See https://github.com/BIDData/BIDMat/blob/master/src/main/scala/BIDMat/HMat.scala , method loadDMatTxt
     def loadFMatTxt(cats:RDD[(Int,Int,Double)], nrows: Int):SMat = {
 
-      val fin = cats.toLocalIterator
+      val rows = cats.map(x=> x._1).collect()
+      val cols = cats.map(x=> x._2).collect()
+      val vals = cats.map(x=> x._3).collect()
 
-      val ncols = 3
 
-      val out = FMat.newOrCheckFMat(nrows, ncols, null)
+      println("LOADING")
 
-      for ((irow,origCol,value) <- fin) {
-        val parts = Array(irow,origCol,value)
-
-        for (icol <- 0 until ncols) {
-          out.data(irow + icol*out.nrows) = parts(icol).toFloat
-
-        }
-      }
-      println("LOADED")
-      cols2sparse(out, true)
+      sparse(icol(cols.toList),icol(rows.toList),col(vals.toList))
     }
 
     def test(categories: DMat, features: SMat, mm: Learner): Unit = {

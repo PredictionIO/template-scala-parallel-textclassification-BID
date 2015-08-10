@@ -46,7 +46,7 @@ class PreparedData(
 
   // 1. Hashing function: Text -> term frequency vector.
 
-  private val hasher = new HashingTF(1000)
+  private val hasher = new HashingTF(7500)
 
   private def hashTF(text: String): Vector = {
     val newList: Array[String] = text.split(" ")
@@ -59,8 +59,7 @@ class PreparedData(
 
 
   private def calculateSPPMI(localMat: Matrix, N: Long, k: Int): IndexedSeq[MatrixEntry] = {
-
-    println(localMat)
+    //println(localMat)
     val pmiMatrixEntries = for (i <- 0 until localMat.numCols; j <- 0 until localMat.numRows)
       yield {
         new MatrixEntry(j, i, math.max(0, math.log(localMat(j, i) * N / (localMat(i, i) * localMat(j, j))) / math.log(2.0) - math.log(k) / math.log(2.0)))
@@ -70,18 +69,28 @@ class PreparedData(
 
   private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : Map[String,Vector] = {
     val hashedFeats = trainData.data.map(e => hashTF(e.text))
-    val indexedRows = hashedFeats.zipWithIndex.map(x => new IndexedRow(x._2, x._1))
+
+    val rows = hashedFeats.map( x => x.toArray.map( value => if (value > 0) 1.0 else 0.0)).map( y => Vectors.dense(y).toSparse)
+
+    val indexedRows = rows.zipWithIndex.map(x => new IndexedRow(x._2, x._1))
+
+    val mat = new IndexedRowMatrix(indexedRows)
 
 
-    val blockMat: BlockMatrix = new IndexedRowMatrix(indexedRows).toBlockMatrix
+    println(mat.toBlockMatrix().toLocalMatrix())
 
     //println(blockMat.numCols())
     //println(blockMat.numRows())
-    val cooccurrences = blockMat.transpose.multiply(blockMat)
-    val locMat = cooccurrences.toLocalMatrix.asInstanceOf[DenseMatrix].toSparse
-    val k = 1
 
-    val pmiEntries = calculateSPPMI(locMat, blockMat.numRows, k)
+
+
+    //val cooccurrences = blockMat.transpose.multiply(blockMat)
+    val cooccurrences = mat.computeGramianMatrix()
+
+
+    val k = 3
+
+    val pmiEntries = calculateSPPMI(cooccurrences , mat.numRows, k)
 
     val pmiMat: CoordinateMatrix = new CoordinateMatrix(sc.parallelize(pmiEntries))
 
@@ -89,9 +98,9 @@ class PreparedData(
 
 
 
-//    val principalComponents = indexedPMIMat.toRowMatrix().computePrincipalComponents(5)
-//
-//    val pcPMImat = indexedPMIMat.multiply(principalComponents)
+    //val principalComponents = indexedPMIMat.toRowMatrix().computePrincipalComponents(5)
+
+   // val pcPMImat = indexedPMIMat.multiply(principalComponents)
 
 
 
@@ -111,17 +120,15 @@ class PreparedData(
           ar = (ar,pmiMatRows(i).toArray).zipped.map(_ + _)
           //ar = ar ++ pmiMatRows(i).toArray
         }
-        Vectors.dense(ar.map(x=> x/v.size)).toSparse }
 
+        //Vectors.dense(ar.map(x=> x/v.size)).toSparse }
+        Vectors.dense(ar.map(x=> x)).toSparse }
 
     val textToSPPMIVectorMap = (trainData.data.map(x=> x.text) zip composedWordVectors).collect.toMap
 
     return textToSPPMIVectorMap
   }
 
-  val ppmiMap = generateSPPMIMatrix(td,sc)
-  println(ppmiMap.head._2.size)
-  println(ppmiMap.head)
 
   // 2. Term frequency vector -> t.f.-i.d.f. vector.
 
@@ -136,10 +143,15 @@ class PreparedData(
 //      //println(result)
 //      result
 //    }
+//
+////
+//
+//
+  val ppmiMap = generateSPPMIMatrix(td,sc)
+  println(ppmiMap.head._2.size)
+  println(ppmiMap.head)
 
-//
-//
-   def transform(text : String): Vector = {
+  def transform(text : String): Vector = {
       // Map(n-gram -> document tf)
 
       val result = ppmiMap(text)

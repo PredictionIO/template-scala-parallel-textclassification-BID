@@ -4,19 +4,25 @@
   "engineFactory": "org.template.textclassification.TextClassificationEngine",
   "datasource": {
     "params": {
-      "appName": "text"
+      "appName": "smallerData"
     }
   },
   "preparator": {
     "params": {
-      "nGram": 2
+      "nGram": 1
     }
   },
   "algorithms": [
     {
-      "name": "bid-lr",
+      "name": "VWlogisticSGD",
       "params": {
-        "regParam": 0.5
+         "maxIter": 1,
+        "regParam": 0.00000005,
+        "stepSize": 5.0,
+        "bitPrecision": 22,
+        "modelName": "model.vw",
+        "namespace": "n",
+        "ngram": 1 
       }
     }
   ]

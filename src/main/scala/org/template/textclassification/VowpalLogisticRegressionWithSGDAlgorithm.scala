@@ -42,17 +42,18 @@ class VowpalLogisticRegressionWithSGDAlgorithm(val ap: AlgorithmParams)
   
     val vw = new VW("--loss_function logistic --invert_hash readable.model -b " + ap.bitPrecision + " " + "-f " + ap.modelName + " " + reg + " " + lrate + " " + ngram)
     
-    val inputs = for (point <- data.td.data) yield (if (point.category.toDouble == 0.0) "-1.0" else "1.0") + " |" + ap.namespace + " "  + rawTextToVWFormattedString(point.text)
+    val inputs = for (point <- data.transformedData) yield (if (point.label.toDouble == 0.0) "-1.0" else "1.0") + " |" + ap.namespace + " "  + vectorToVWFormattedString(point.features)
    
      //Regressing    
     //val inputs = for (point <- data.td.data) yield point.category.toDouble.toString + " |" + ap.namespace + " "  + rawTextToVWFormattedString(point.text)
 
 
-    for (item <- inputs.collect()) logger.info(item)
+    val inputsCollected = inputs.collect()
+    for (item <- inputsCollected) logger.info(item)
 
-    val results = for (item <- inputs.collect()) yield vw.learn(item)
+    val results = for (item <- inputsCollected) yield vw.learn(item)
 
-    val matchOnTrainSet = for (item <- inputs.collect()) yield  item.startsWith(if(vw.predict(item).toDouble  > 0.5) "1" else "-1")
+    val matchOnTrainSet = for (item <- inputsCollected) yield  item.startsWith(if(vw.predict(item).toDouble  > 0.5) "1" else "-1")
 
 
     val acc = (for (x <- matchOnTrainSet) yield if(x) 1 else 0).sum.toDouble / matchOnTrainSet.size

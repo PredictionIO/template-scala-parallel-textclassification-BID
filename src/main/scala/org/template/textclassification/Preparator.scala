@@ -67,7 +67,7 @@ class PreparedData(
     return pmiMatrixEntries
   }
 
-  private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : Map[String,Vector] = {
+  private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : RDD[(String,SparseVector)] = {
     val hashedFeats = trainData.data.map(e => hashTF(e.text))
 
     val rows = hashedFeats.map( x => x.toArray.map( value => if (value > 0) 1.0 else 0.0)).map( y => Vectors.dense(y).toSparse)
@@ -124,7 +124,7 @@ class PreparedData(
         //Vectors.dense(ar.map(x=> x/v.size)).toSparse }
         Vectors.dense(ar.map(x=> x)).toSparse }
 
-    val textToSPPMIVectorMap = (trainData.data.map(x=> x.text) zip composedWordVectors).collect.toMap
+    val textToSPPMIVectorMap = (trainData.data.map(x=> x.text) zip composedWordVectors)
 
     return textToSPPMIVectorMap
   }
@@ -147,7 +147,7 @@ class PreparedData(
 ////
 //
 //
-  val ppmiMap = generateSPPMIMatrix(td,sc)
+  val ppmiMap = generateSPPMIMatrix(td,sc).collectAsMap()
   println(ppmiMap.head._2.size)
   println(ppmiMap.head)
 

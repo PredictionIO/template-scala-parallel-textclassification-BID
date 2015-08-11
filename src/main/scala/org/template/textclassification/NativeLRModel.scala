@@ -28,7 +28,7 @@ trait NativeLRModel {
 
     // 2. Initialize logistic regression model with regularization parameter.
 
-    labels.foldLeft(pd.transformedData.toDF)(//transform to Spark DataFrame
+    labels.foldLeft(pd.transformedData.map(x => x.point).toDF)(//transform to Spark DataFrame
 
       // Add the different binary columns for each label.
       (data: DataFrame, label: Double) => {
@@ -48,7 +48,7 @@ trait NativeLRModel {
 
   // 5. Define prediction rule.
   def predict(text : String,  pd : PreparedData,lrModels:Seq[(Double, LREstimate)]): PredictedResult = {
-    val x : Array[Double] = pd.transform(text).toArray
+    val x : Array[Double] = pd.transform(text).vector.toArray
 
     // Logistic Regression binary formula for positive probability.
     // According to MLLib documentation, class labeled 0 is used as pivot.

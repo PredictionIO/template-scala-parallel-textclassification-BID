@@ -24,6 +24,16 @@ case class PreparatorParams(
                              nGram: Int
                              ) extends Params
 
+case class VectorAndTextExample(
+                        vector: Vector,
+                        text : String
+                        ) extends Serializable
+
+case class LabeledPointAndTextExample(
+                                 point: LabeledPoint,
+                                 text : String
+                                 ) extends Serializable
+
 
 // 2. Initialize your Preparator class.
 
@@ -46,7 +56,7 @@ class PreparedData(
 
   // 1. Hashing function: Text -> term frequency vector.
 
-  private val hasher = new HashingTF(7500)
+  private val hasher = new HashingTF(500)
 
   private def hashTF(text: String): Vector = {
     val newList: Array[String] = text.split(" ")
@@ -88,7 +98,7 @@ class PreparedData(
     val cooccurrences = mat.computeGramianMatrix()
 
 
-    val k = 3
+    val k = 10
 
     val pmiEntries = calculateSPPMI(cooccurrences , mat.numRows, k)
 
@@ -117,8 +127,8 @@ class PreparedData(
       yield {
         var ar =  Array.fill[Double](pmiMatRows.head._2.size)(0)
         for( i <- 0 until v.size; if v(i) > 0){
-          ar = (ar,pmiMatRows(i).toArray).zipped.map(_ + _)
-          //ar = ar ++ pmiMatRows(i).toArray
+          //ar = (ar,pmiMatRows(i).toArray).zipped.map(_ + _)
+          ar = ar ++ pmiMatRows(i).toArray
         }
 
         //Vectors.dense(ar.map(x=> x/v.size)).toSparse }
@@ -151,10 +161,10 @@ class PreparedData(
   println(ppmiMap.head._2.size)
   println(ppmiMap.head)
 
-  def transform(text : String): Vector = {
+  def transform(text : String): VectorAndTextExample = {
       // Map(n-gram -> document tf)
 
-      val result = ppmiMap(text)
+      val result = VectorAndTextExample(ppmiMap(text), text)
       //println(result)
       result
     }
@@ -164,8 +174,8 @@ class PreparedData(
 
   // 4. Data Transformer: RDD[documents] => RDD[LabeledPoints]
 
-  val transformedData: RDD[(LabeledPoint)] = {
-    td.data.map(e => LabeledPoint(e.label, transform(e.text)))
+  val transformedData: RDD[LabeledPointAndTextExample] = {
+    td.data.map(e =>  LabeledPointAndTextExample(LabeledPoint(e.label, transform(e.text).vector), e.text))
   }
 
 

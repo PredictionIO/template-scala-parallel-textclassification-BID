@@ -42,14 +42,16 @@ class VowpalLogisticRegressionWithSGDAlgorithm(val ap: AlgorithmParams)
   
     val vw = new VW("--loss_function logistic --invert_hash readable.model -b " + ap.bitPrecision + " " + "-f " + ap.modelName + " " + reg + " " + lrate + " " + ngram)
     
-    val inputs = for (point <- data.transformedData) yield (if (point.label.toDouble == 0.0) "-1.0" else "1.0") + " |" + ap.namespace + " "  + vectorToVWFormattedString(point.features)
-   
+    val inputs = for (point <- data.transformedData) yield (if (point.point.label.toDouble == 0.0) "-1.0" else "1.0") + " |" + ap.namespace + " " + rawTextToVWFormattedString(point.text) + " "  + vectorToVWFormattedString(point.point.features)
+
+    //val inputs = for (point <- data.transformedData) yield (if (point.label.toDouble == 0.0) "-1.0" else "1.0") + " |" + ap.namespace + " "  + rawTextToVWFormattedString(point.)
+
      //Regressing    
     //val inputs = for (point <- data.td.data) yield point.category.toDouble.toString + " |" + ap.namespace + " "  + rawTextToVWFormattedString(point.text)
 
 
     val inputsCollected = inputs.collect()
-    for (item <- inputsCollected) logger.info(item)
+    //for (item <- inputsCollected) logger.info(item)
 
     val results = for (item <- inputsCollected) yield vw.learn(item)
 

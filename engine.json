@@ -9,12 +9,13 @@
   },
   "preparator": {
     "params": {
-      "nGram": 1
+      "nGram": 1,
+      "SPPMI": true
     }
   },
   "algorithms": [
     {
-      "name": "VWlogisticSGD",
+      "name": "bid-lr",
       "params": {
          "maxIter": 1,
         "regParam": 0.00000005,

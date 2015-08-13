@@ -58,4 +58,4 @@ if [ ! `uname` = "Darwin" ]; then
     export JAVA_OPTS="${DJAVA_NATIVE} ${JAVA_OPTS}"
 fi
 
-pio train -- --driver-memory 12g --executor-memory 12g
+pio train -- --driver-memory 16g --executor-memory 8g --conf spark.driver.maxResultSize=3g --conf spark.network.timeout=500s

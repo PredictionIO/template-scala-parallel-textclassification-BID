@@ -11,6 +11,7 @@ import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 
+import scala.collection.Map
 import scala.collection.immutable.HashMap
 import scala.collection.JavaConversions._
 import scala.math._
@@ -21,7 +22,8 @@ import scala.math._
 // components.
 
 case class PreparatorParams(
-                             nGram: Int
+                             nGram: Int,
+                             SPPMI: Boolean
                              ) extends Params
 
 case class VectorAndTextExample(
@@ -41,7 +43,7 @@ class Preparator(pp: PreparatorParams) extends PPreparator[TrainingData, Prepare
 
   // Prepare your training data.
   def prepare(sc: SparkContext, td: TrainingData): PreparedData = {
-    new PreparedData(td, pp.nGram, sc)
+    new PreparedData(td, pp.nGram,pp.SPPMI, sc)
   }
 }
 
@@ -50,13 +52,36 @@ class Preparator(pp: PreparatorParams) extends PPreparator[TrainingData, Prepare
 class PreparedData(
                     val td: TrainingData,
                     val nGram: Int,
+                    val SPPMI: Boolean,
                     @transient val sc: SparkContext
                     ) extends Serializable {
 
 
   // 1. Hashing function: Text -> term frequency vector.
 
-  private val hasher = new HashingTF(500)
+  private val hasher = new HashingTF(5000)
+
+
+  def transform(text: String): VectorAndTextExample ={
+    return if(SPPMI) transformSPPMI(text) else transformTFIDF(text)
+  }
+
+  val idf : IDFModel = new IDF().fit(td.data.map(e => hashTF(e.text)))
+
+
+  //3. Document Transformer: text => tf-idf vector.
+
+  private def transformTFIDF(text : String): VectorAndTextExample = {
+    // Map(n-gram -> document tf)
+    val result = VectorAndTextExample(idf.transform(hashTF(text)), text)
+    //println(result)
+    result
+  }
+
+  val ppmiMap = generateSPPMIMatrix(td,sc).collectAsMap()
+  println(ppmiMap.head._2.size)
+  println(ppmiMap.head)
+
 
   private def hashTF(text: String): Vector = {
     val newList: Array[String] = text.split(" ")
@@ -65,6 +90,14 @@ class PreparedData(
       .toArray
 
     hasher.transform(newList)
+  }
+
+  private def transformSPPMI(text : String): VectorAndTextExample = {
+    // Map(n-gram -> document tf)
+
+    val result = VectorAndTextExample(ppmiMap(text), text)
+    //println(result)
+    result
   }
 
 
@@ -78,9 +111,51 @@ class PreparedData(
   }
 
   private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : RDD[(String,SparseVector)] = {
+    val (hashedFeats: RDD[Vector], mat: IndexedRowMatrix, cooccurrences: Matrix) = computeCooccurrences(trainData)
+
+    val k = 10
+    val pmiEntries = calculateSPPMI(cooccurrences , mat.numRows, k)
+    val pmiMat: CoordinateMatrix = new CoordinateMatrix(sc.parallelize(pmiEntries))
+    val indexedPMIMat = pmiMat.toIndexedRowMatrix()
+
+    //val principalComponents = indexedPMIMat.toRowMatrix().computePrincipalComponents(500)
+    //val pcPMImat = indexedPMIMat.multiply(principalComponents)
+
+    println(trainData.data.count())
+    println(indexedPMIMat.numCols())
+//    println(pcPMImat.numCols())
+
+    val pmiMatRows = indexedPMIMat.rows.map(e=> e.index -> e.vector).collectAsMap()
+
+    return generateTextToSPPMIVectorMap(trainData, hashedFeats, pmiMatRows)
+  }
+
+  private def generateTextToSPPMIVectorMap(trainData: TrainingData, hashedFeats: RDD[Vector], pmiMatRows: Map[Long, Vector]): RDD[(String, SparseVector)] = {
+    //TODO: take into account feature counts, currently it's on/off
+    //also not use var
+    val composedWordVectors = for (v <- hashedFeats)
+      yield {
+        var ar = Array.fill[Double](pmiMatRows.head._2.size)(0)
+        for (i <- 0 until v.size; if v(i) > 0) {
+          //Additive
+          //ar = (ar,pmiMatRows(i).toArray).zipped.map(_ + _)
+
+          //Appending
+          ar = ar ++ pmiMatRows(i).toArray
+        }
+
+        //Vectors.dense(ar.map(x=> x/v.size)).toSparse }
+        Vectors.dense(ar.map(x => x)).toSparse
+      }
+
+    val textToSPPMIVectorMap = (trainData.data.map(x => x.text) zip composedWordVectors)
+    textToSPPMIVectorMap
+  }
+
+  private def computeCooccurrences(trainData: TrainingData): (RDD[Vector], IndexedRowMatrix, Matrix) = {
     val hashedFeats = trainData.data.map(e => hashTF(e.text))
 
-    val rows = hashedFeats.map( x => x.toArray.map( value => if (value > 0) 1.0 else 0.0)).map( y => Vectors.dense(y).toSparse)
+    val rows = hashedFeats.map(x => x.toArray.map(value => if (value > 0) 1.0 else 0.0)).map(y => Vectors.dense(y).toSparse)
 
     val indexedRows = rows.zipWithIndex.map(x => new IndexedRow(x._2, x._1))
 
@@ -92,82 +167,15 @@ class PreparedData(
     //println(blockMat.numCols())
     //println(blockMat.numRows())
 
-
-
-    //val cooccurrences = blockMat.transpose.multiply(blockMat)
     val cooccurrences = mat.computeGramianMatrix()
-
-
-    val k = 10
-
-    val pmiEntries = calculateSPPMI(cooccurrences , mat.numRows, k)
-
-    val pmiMat: CoordinateMatrix = new CoordinateMatrix(sc.parallelize(pmiEntries))
-
-    val indexedPMIMat = pmiMat.toIndexedRowMatrix()
-
-
-
-    //val principalComponents = indexedPMIMat.toRowMatrix().computePrincipalComponents(5)
-
-   // val pcPMImat = indexedPMIMat.multiply(principalComponents)
-
-
-
-    println(trainData.data.count())
-    println(indexedPMIMat.numCols())
-//    println(pcPMImat.numCols())
-
-    val pmiMatRows = indexedPMIMat.rows.map(e=> e.index -> e.vector).collectAsMap()
-
-    //TODO: take into account feature counts, currently it's on/off
-    //also not use var
-    //j<- 0 until v(i).toIn
-    val composedWordVectors = for(v<- hashedFeats)
-      yield {
-        var ar =  Array.fill[Double](pmiMatRows.head._2.size)(0)
-        for( i <- 0 until v.size; if v(i) > 0){
-          //ar = (ar,pmiMatRows(i).toArray).zipped.map(_ + _)
-          ar = ar ++ pmiMatRows(i).toArray
-        }
-
-        //Vectors.dense(ar.map(x=> x/v.size)).toSparse }
-        Vectors.dense(ar.map(x=> x)).toSparse }
-
-    val textToSPPMIVectorMap = (trainData.data.map(x=> x.text) zip composedWordVectors)
-
-    return textToSPPMIVectorMap
+    //Alternatively:
+    //val cooccurrences = blockMat.transpose.multiply(blockMat)
+    (hashedFeats, mat, cooccurrences)
   }
 
 
-  // 2. Term frequency vector -> t.f.-i.d.f. vector.
 
-//  val idf : IDFModel = new IDF().fit(td.data.map(e => hashTF(e.text)))
-//
-//
-//   //3. Document Transformer: text => tf-idf vector.
-//
-//    def transform(text : String): Vector = {
-//      // Map(n-gram -> document tf)
-//      val result = idf.transform(hashTF(text))
-//      //println(result)
-//      result
-//    }
-//
-////
-//
-//
-  val ppmiMap = generateSPPMIMatrix(td,sc).collectAsMap()
-  println(ppmiMap.head._2.size)
-  println(ppmiMap.head)
 
-  def transform(text : String): VectorAndTextExample = {
-      // Map(n-gram -> document tf)
-
-      val result = VectorAndTextExample(ppmiMap(text), text)
-      //println(result)
-      result
-    }
 
 
 

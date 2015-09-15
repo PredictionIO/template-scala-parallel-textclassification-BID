@@ -146,7 +146,7 @@ class PreparedData(
         }
 
         val normalized = ar.map(x=> x/v.size).zipWithIndex.map(x => (x._2, x._1))
-        Vectors.sparse(normalized.size, normalized) }
+        Vectors.sparse(normalized.size, normalized)
 
       }
 

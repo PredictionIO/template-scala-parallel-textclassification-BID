@@ -145,8 +145,9 @@ class PreparedData(
           ar = ar ++ pmiMatRows(i).toArray
         }
 
-        //Vectors.dense(ar.map(x=> x/v.size)).toSparse }
-        Vectors.dense(ar.map(x => x)).toSparse
+        val normalized = ar.map(x=> x/v.size).zipWithIndex.map(x => (x._2, x._1))
+        Vectors.sparse(normalized.size, normalized) }
+
       }
 
     val textToSPPMIVectorMap = (trainData.data.map(x => x.text) zip composedWordVectors)
@@ -156,14 +157,14 @@ class PreparedData(
   private def computeCooccurrences(trainData: TrainingData): (RDD[Vector], IndexedRowMatrix, Matrix) = {
     val hashedFeats = trainData.data.map(e => hashTF(e.text))
 
-    val rows = hashedFeats.map(x => x.toArray.map(value => if (value > 0) 1.0 else 0.0)).map(y => Vectors.dense(y).toSparse)
+    val rows = hashedFeats.map( x => x.toArray.map( value => if (value > 0) 1.0 else 0.0)).map( y => Vectors.dense(y))
 
     val indexedRows = rows.zipWithIndex.map(x => new IndexedRow(x._2, x._1))
 
     val mat = new IndexedRowMatrix(indexedRows)
 
 
-    println(mat.toBlockMatrix().toLocalMatrix())
+    //println(mat.toBlockMatrix().toLocalMatrix())
 
     //println(blockMat.numCols())
     //println(blockMat.numRows())

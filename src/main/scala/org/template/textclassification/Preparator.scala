@@ -111,7 +111,7 @@ class PreparedData(
     return pmiMatrixEntries
   }
 
-  private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : RDD[(String,SparseVector)] = {
+  private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : RDD[(String,Vector)] = {
     val (hashedFeats: RDD[Vector], mat: IndexedRowMatrix, cooccurrences: Matrix) = computeCooccurrences(trainData)
 
     val k = 10
@@ -130,8 +130,7 @@ class PreparedData(
 
     return generateTextToSPPMIVectorMap(trainData, hashedFeats, pmiMatRows)
   }
-
-  private def generateTextToSPPMIVectorMap(trainData: TrainingData, hashedFeats: RDD[Vector], pmiMatRows: Map[Long, Vector]): RDD[(String, SparseVector)] = {
+  private def generateTextToSPPMIVectorMap(trainData: TrainingData, hashedFeats: RDD[Vector], pmiMatRows: Map[Long, Vector]): RDD[(String, Vector)] = {
     //TODO: take into account feature counts, currently it's on/off
     //also not use var
     val composedWordVectors = for (v <- hashedFeats)

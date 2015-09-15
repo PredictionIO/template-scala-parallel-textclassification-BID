@@ -107,7 +107,7 @@ class BIDMachLRAlgorithm(
     def getFMatsFromData(lab: String, data:DataFrame): (FMat, SMat) = {
       val features = data.select(lab, "features")
 
-      val sparseVectorsWithRowIndices = (for (r <- features) yield (r.getAs[SparseVector](1), r.getAs[Double](0))).zipWithIndex
+      val sparseVectorsWithRowIndices = (for (r <- features) yield (r.getAs[SparseVector](1), r.getAs[Double](0))).zipWithIndex 
 
       val triples = for {
         ((vector, innerLabel), rowIndex) <- sparseVectorsWithRowIndices

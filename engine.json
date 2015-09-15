@@ -10,6 +10,7 @@
   "preparator": {
     "params": {
       "nGram": 1,
+      "numFeatures": 5000,
       "SPPMI": true
     }
   },

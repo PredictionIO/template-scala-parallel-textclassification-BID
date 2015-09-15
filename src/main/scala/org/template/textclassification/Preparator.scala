@@ -22,9 +22,10 @@ import scala.math._
 // components.
 
 case class PreparatorParams(
-                             nGram: Int,
-                             SPPMI: Boolean
-                             ) extends Params
+  nGram: Int,
+  numFeatures: Int = 5000,
+  SPPMI: Boolean
+) extends Params
 
 case class VectorAndTextExample(
                         vector: Vector,
@@ -42,24 +43,24 @@ case class LabeledPointAndTextExample(
 class Preparator(pp: PreparatorParams) extends PPreparator[TrainingData, PreparedData] {
 
   // Prepare your training data.
-  def prepare(sc: SparkContext, td: TrainingData): PreparedData = {
-    new PreparedData(td, pp.nGram,pp.SPPMI, sc)
+  def prepare(sc : SparkContext, td: TrainingData): PreparedData = {
+    new PreparedData(td, pp.nGram, pp.numFeatures, pp.SPPMI, sc)
   }
 }
 
 //------PreparedData------------------------
 
 class PreparedData(
-                    val td: TrainingData,
-                    val nGram: Int,
-                    val SPPMI: Boolean,
-                    @transient val sc: SparkContext
-                    ) extends Serializable {
-
+  val td: TrainingData,
+  val nGram: Int,
+  val numFeatures: Int,
+  val SPPMI: Boolean,
+  @transient val sc: SparkContext
+) extends Serializable {
 
   // 1. Hashing function: Text -> term frequency vector.
 
-  private val hasher = new HashingTF(5000)
+  private val hasher = new HashingTF(numFeatures = numFeatures)
 
 
   def transform(text: String): VectorAndTextExample ={

@@ -111,7 +111,7 @@ class PreparedData(
     return pmiMatrixEntries
   }
 
-  private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : RDD[(String,Vector)] = {
+  private def generateSPPMIMatrix(trainData: TrainingData, sc:SparkContext) : RDD[(String,SparseVector)] = {
     val (hashedFeats: RDD[Vector], mat: IndexedRowMatrix, cooccurrences: Matrix) = computeCooccurrences(trainData)
 
     val k = 10
@@ -130,7 +130,7 @@ class PreparedData(
 
     return generateTextToSPPMIVectorMap(trainData, hashedFeats, pmiMatRows)
   }
-  private def generateTextToSPPMIVectorMap(trainData: TrainingData, hashedFeats: RDD[Vector], pmiMatRows: Map[Long, Vector]): RDD[(String, Vector)] = {
+  private def generateTextToSPPMIVectorMap(trainData: TrainingData, hashedFeats: RDD[Vector], pmiMatRows: Map[Long, Vector]): RDD[(String, SparseVector)] = {
     //TODO: take into account feature counts, currently it's on/off
     //also not use var
     val composedWordVectors = for (v <- hashedFeats)
@@ -144,9 +144,7 @@ class PreparedData(
           ar = ar ++ pmiMatRows(i).toArray
         }
 
-        val normalized = ar.map(x=> x/v.size).zipWithIndex.map(x => (x._2, x._1))
-        Vectors.sparse(normalized.size, normalized)
-
+        Vectors.dense(ar.map(x => x)).toSparse
       }
 
     val textToSPPMIVectorMap = (trainData.data.map(x => x.text) zip composedWordVectors)
@@ -156,7 +154,8 @@ class PreparedData(
   private def computeCooccurrences(trainData: TrainingData): (RDD[Vector], IndexedRowMatrix, Matrix) = {
     val hashedFeats = trainData.data.map(e => hashTF(e.text))
 
-    val rows = hashedFeats.map( x => x.toArray.map( value => if (value > 0) 1.0 else 0.0)).map( y => Vectors.dense(y))
+    val rows = hashedFeats.map( x => 
+      x.toArray.map( value => if (value > 0) 1.0 else 0.0)).map( y => Vectors.dense(y).toSparse)
 
     val indexedRows = rows.zipWithIndex.map(x => new IndexedRow(x._2, x._1))
 

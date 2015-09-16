@@ -28,7 +28,7 @@ case class PreparatorParams(
 ) extends Params
 
 case class VectorAndTextExample(
-                        vector: Vector,
+                        vector: SparseVector,
                         text : String
                         ) extends Serializable
 
@@ -74,7 +74,7 @@ class PreparedData(
 
   private def transformTFIDF(text : String): VectorAndTextExample = {
     // Map(n-gram -> document tf)
-    val result = VectorAndTextExample(idf.transform(hashTF(text)), text)
+    val result = VectorAndTextExample(idf.transform(hashTF(text)).toSparse, text)
     //println(result)
     result
   }
